@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal LLM API Cost Calculator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    input[type=range] {
+      accent-color: #2563eb;
+    }
+    .transition-card {
+      transition: all 0.2s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 transform transition-all duration-300 opacity-0 pointer-events-none translate-y-[-10px]">
+    <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+    <span id="toast-message" class="text-sm font-medium">Copied to clipboard!</span>
+  </div>
+
+  <!-- Header Banner -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">API Cost Calculator</h1>
+            <span id="header-model-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+              Gemini 4 Argon
+            </span>
+          </div>
+          <p class="text-xs text-slate-500">Universal token pricing estimator with user-defined rates, caching, and batch modeling</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Toolbar -->
+      <div class="flex items-center gap-2">
+        <button id="btn-reset-defaults" type="button" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-all">
+          Reset to Defaults
+        </button>
+        <button id="btn-copy-summary" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          Copy Summary
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+    
+    <!-- Model & Pricing Configuration Section -->
+    <section class="mb-8 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm" aria-labelledby="model-config-heading">
+      <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-3">
+        <div>
+          <h2 id="model-config-heading" class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+            1. Model & Pricing Configuration
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">Customize your model name and token pricing rates per 1,000,000 tokens</p>
+        </div>
+
+        <!-- Quick Model Presets -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-xs font-semibold text-slate-400 mr-1">Presets:</span>
+          <button id="model-preset-gemini-promo" type="button" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
+            Gemini 4 Argon ($2 / $10)
+          </button>
+          <button id="model-preset-gemini-base" type="button" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Gemini 4 Base ($4 / $20)
+          </button>
+          <button id="model-preset-gpt4o" type="button" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            GPT-4o ($2.50 / $10)
+          </button>
+          <button id="model-preset-claude" type="button" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Claude 3.5 Sonnet ($3 / $15)
+          </button>
+          <button id="model-preset-llama" type="button" class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Llama 3.3 70B ($0.40 / $0.40)
+          </button>
+        </div>
+      </div>
+
+      <!-- Config Inputs Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Model Name Input -->
+        <div class="space-y-1.5">
+          <label for="custom-model-name" class="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+            Model Name
+          </label>
+          <div class="relative">
+            <input id="custom-model-name" type="text" value="Gemini 4 Argon" class="w-full px-3 py-2 text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+          </div>
+          <span class="text-[11px] text-slate-400 block">Name of the target AI model</span>
+        </div>
+
+        <!-- Input Token Rate ($/1M) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label for="rate-input-per-m" class="text-xs font-bold uppercase tracking-wider text-blue-800 block">
+              Input Rate ($ / 1M)
+            </label>
+            <span id="label-cost-per-input-tok" class="text-[11px] font-mono text-blue-600 font-medium">$0.0000020 / tok</span>
+          </div>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm font-bold">$</span>
+            <input id="rate-input-per-m" type="number" min="0" max="500" step="0.01" value="2.00" class="w-full pl-7 pr-3 py-2 text-sm font-bold text-blue-950 bg-blue-50/40 border border-blue-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all">
+          </div>
+          <span class="text-[11px] text-slate-400 block">Prompt token cost per million</span>
+        </div>
+
+        <!-- Output Token Rate ($/1M) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label for="rate-output-per-m" class="text-xs font-bold uppercase tracking-wider text-indigo-800 block">
+              Output Rate ($ / 1M)
+            </label>
+            <span id="label-cost-per-output-tok" class="text-[11px] font-mono text-indigo-600 font-medium">$0.0000100 / tok</span>
+          </div>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm font-bold">$</span>
+            <input id="rate-output-per-m" type="number" min="0" max="500" step="0.01" value="10.00" class="w-full pl-7 pr-3 py-2 text-sm font-bold text-indigo-950 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all">
+          </div>
+          <span class="text-[11px] text-slate-400 block">Generation token cost per million</span>
+        </div>
+
+        <!-- Cached Input Rate ($/1M) -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label for="rate-cache-per-m" class="text-xs font-bold uppercase tracking-wider text-emerald-800 block">
+              Cached Rate ($ / 1M)
+            </label>
+            <span id="label-cost-per-cache-tok" class="text-[11px] font-mono text-emerald-600 font-medium">$0.0000001 / tok</span>
+          </div>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm font-bold">$</span>
+            <input id="rate-cache-per-m" type="number" min="0" max="500" step="0.01" value="0.10" class="w-full pl-7 pr-3 py-2 text-sm font-bold text-emerald-950 bg-emerald-50/40 border border-emerald-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all">
+          </div>
+          <span class="text-[11px] text-slate-400 block">Context cached token rate</span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Workload Presets Bar -->
+    <div class="mb-6 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Token Workload Presets:</span>
+        <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button id="preset-example" type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
+            ★ Standard Example (50k In / 10k Out)
+          </button>
+          <button id="preset-chat" type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Chat (2.5k In / 600 Out)
+          </button>
+          <button id="preset-coding" type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Code Review (25k In / 4k Out)
+          </button>
+          <button id="preset-doc" type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Document Analysis (120k In / 8k Out)
+          </button>
+          <button id="preset-cache" type="button" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+            Context Caching (80k Cached + 10k New / 3k Out)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 Column Layout: Token Parameters on Left, Metrics & Analytics on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column: Token & Volume Controls (5 Cols) -->
+      <section class="lg:col-span-5 flex flex-col gap-6" aria-labelledby="token-controls-heading">
+        <h2 id="token-controls-heading" class="sr-only">Token and Volume Controls</h2>
+        
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col gap-6">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              2. Token & Request Parameters
+            </h3>
+            <span class="text-xs text-slate-400">Reactive Live Model</span>
+          </div>
+
+          <!-- Fresh Input Tokens -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <label for="input-tokens" class="text-sm font-semibold text-slate-700">
+                Fresh Input Tokens
+                <span id="label-applied-input-rate" class="text-xs font-normal text-slate-500">($2.00 / 1M)</span>
+              </label>
+              <input id="input-tokens" type="number" min="0" max="5000000" step="500" value="50000" class="w-32 px-2.5 py-1 text-right text-sm font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <input id="slider-input-tokens" type="range" min="0" max="200000" step="1000" value="50000" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+            <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+              <span>0</span>
+              <span>50k</span>
+              <span>100k</span>
+              <span>200k</span>
+            </div>
+          </div>
+
+          <!-- Context Caching Toggle & Input -->
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <input id="toggle-cache" type="checkbox" class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer">
+                <label for="toggle-cache" class="text-sm font-semibold text-slate-800 cursor-pointer select-none">
+                  Enable Context Caching
+                </label>
+              </div>
+              <span id="badge-cache-discount" class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">
+                Cached Rate Active
+              </span>
+            </div>
+            
+            <div id="cache-controls" class="space-y-2 opacity-50 pointer-events-none transition-opacity">
+              <div class="flex justify-between items-center">
+                <label for="cached-tokens" class="text-xs font-medium text-slate-600">
+                  Cached Input Tokens
+                  <span id="label-applied-cache-rate" class="text-[11px] text-slate-500">($0.10 / 1M)</span>
+                </label>
+                <input id="cached-tokens" type="number" min="0" max="5000000" step="1000" value="0" class="w-32 px-2.5 py-1 text-right text-sm font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              </div>
+              <input id="slider-cached-tokens" type="range" min="0" max="200000" step="1000" value="0" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+              <p class="text-[11px] text-slate-500 italic">Tokens reused from cache are billed at your custom cached token rate.</p>
+            </div>
+          </div>
+
+          <!-- Output Tokens -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center">
+              <label for="output-tokens" class="text-sm font-semibold text-slate-700">
+                Generated Output Tokens
+                <span id="label-applied-output-rate" class="text-xs font-normal text-slate-500">($10.00 / 1M)</span>
+              </label>
+              <input id="output-tokens" type="number" min="0" max="2000000" step="500" value="10000" class="w-32 px-2.5 py-1 text-right text-sm font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <input id="slider-output-tokens" type="range" min="0" max="50000" step="500" value="10000" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+            <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+              <span>0</span>
+              <span>10k</span>
+              <span>25k</span>
+              <span>50k</span>
+            </div>
+          </div>
+
+          <!-- Batch / Volume Multiplier -->
+          <div class="pt-3 border-t border-slate-100 space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <label for="request-count" class="text-sm font-semibold text-slate-700 block">Batch / Monthly Requests</label>
+                <span class="text-xs text-slate-500">Projected call frequency</span>
+              </div>
+              <input id="request-count" type="number" min="1" max="10000000" step="100" value="1" class="w-32 px-2.5 py-1 text-right text-sm font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div class="flex gap-2">
+              <button id="vol-1" type="button" class="flex-1 py-1 text-xs font-medium rounded bg-slate-100 hover:bg-slate-200 text-slate-700">1 req</button>
+              <button id="vol-100" type="button" class="flex-1 py-1 text-xs font-medium rounded bg-slate-100 hover:bg-slate-200 text-slate-700">100</button>
+              <button id="vol-1k" type="button" class="flex-1 py-1 text-xs font-medium rounded bg-slate-100 hover:bg-slate-200 text-slate-700">1,000</button>
+              <button id="vol-10k" type="button" class="flex-1 py-1 text-xs font-medium rounded bg-slate-100 hover:bg-slate-200 text-slate-700">10,000</button>
+              <button id="vol-100k" type="button" class="flex-1 py-1 text-xs font-medium rounded bg-slate-100 hover:bg-slate-200 text-slate-700">100,000</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Dynamic Formula Card -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-md">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Dynamic Calculation Formula</h4>
+            <span id="formula-model-tag" class="text-[11px] text-blue-400 font-mono">Gemini 4 Argon</span>
+          </div>
+          <div id="dynamic-formula" class="font-mono text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-700 leading-relaxed text-slate-200 break-words whitespace-pre-line">
+            <!-- Dynamic calculation string injected here -->
+          </div>
+          <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+            Formula: Total Cost = (Input Tokens × Input Rate / 1M) + (Cached Tokens × Cache Rate / 1M) + (Output Tokens × Output Rate / 1M).
+          </p>
+        </div>
+
+      </section>
+
+      <!-- Right Column: Results, Breakdown & Visual Analytics (7 Cols) -->
+      <section class="lg:col-span-7 flex flex-col gap-6" aria-labelledby="results-analytics-heading">
+        <h2 id="results-analytics-heading" class="sr-only">Cost Results and Visual Breakdown</h2>
+        
+        <!-- Primary KPI Summary Card -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm transition-card">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Calculated Cost</span>
+                <span id="summary-model-pill" class="text-xs px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800">Gemini 4 Argon</span>
+              </div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span id="metric-total-cost" class="text-4xl font-extrabold text-slate-900 tracking-tight">$0.20</span>
+                <span class="text-sm font-semibold text-slate-500">per request</span>
+              </div>
+            </div>
+
+            <!-- Volume Cost Highlight if requests > 1 -->
+            <div id="volume-highlight-box" class="hidden sm:text-right bg-blue-50 sm:bg-transparent p-3 sm:p-0 rounded-xl">
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-600 sm:text-slate-400">Batch / Volume Total</span>
+              <div class="text-2xl font-extrabold text-blue-700 sm:text-slate-900 mt-1" id="metric-batch-cost">$0.20</div>
+              <span id="metric-batch-subtext" class="text-xs text-slate-500">for 1 request</span>
+            </div>
+          </div>
+
+          <!-- Itemized Breakdown Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+            
+            <!-- Fresh Input Card -->
+            <div class="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-xs text-blue-900 font-semibold mb-1">
+                <span>Fresh Input</span>
+                <span id="card-input-pct" class="text-[11px] text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded">50%</span>
+              </div>
+              <div id="card-input-cost" class="text-xl font-bold text-blue-950">$0.1000</div>
+              <div class="flex justify-between items-center text-[11px] text-blue-700/80 mt-1 font-mono">
+                <span id="card-input-tokens">50,000 tok</span>
+                <span id="card-input-rate-sub">$2.00/1M</span>
+              </div>
+            </div>
+
+            <!-- Cached Input Card -->
+            <div class="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-xs text-emerald-900 font-semibold mb-1">
+                <span>Cached Input</span>
+                <span id="card-cache-pct" class="text-[11px] text-emerald-600 bg-emerald-100/80 px-1.5 py-0.5 rounded">0%</span>
+              </div>
+              <div id="card-cache-cost" class="text-xl font-bold text-emerald-950">$0.0000</div>
+              <div class="flex justify-between items-center text-[11px] text-emerald-700/80 mt-1 font-mono">
+                <span id="card-cache-tokens">0 tok</span>
+                <span id="card-cache-rate-sub">$0.10/1M</span>
+              </div>
+            </div>
+
+            <!-- Output Card -->
+            <div class="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-xs text-indigo-900 font-semibold mb-1">
+                <span>Generated Output</span>
+                <span id="card-output-pct" class="text-[11px] text-indigo-600 bg-indigo-100/80 px-1.5 py-0.5 rounded">50%</span>
+              </div>
+              <div id="card-output-cost" class="text-xl font-bold text-indigo-950">$0.1000</div>
+              <div class="flex justify-between items-center text-[11px] text-indigo-700/80 mt-1 font-mono">
+                <span id="card-output-tokens">10,000 tok</span>
+                <span id="card-output-rate-sub">$10.00/1M</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Effective Blended Rate Banner -->
+          <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 text-slate-700 font-medium">
+              <span class="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0"></span>
+              <span id="blended-rate-text">Effective Blended Cost: <strong>$3.33 per 1M total tokens</strong> processed ($0.0000033/tok).</span>
+            </div>
+            <span id="total-tokens-badge" class="px-2 py-0.5 rounded font-mono font-bold bg-slate-200 text-slate-800 text-[11px] whitespace-nowrap">60,000 Total Tokens</span>
+          </div>
+        </div>
+
+        <!-- Visual Analytics: Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Doughnut Chart: Cost Share Breakdown -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Cost Share Breakdown</h3>
+            <div class="relative h-56 flex items-center justify-center">
+              <canvas id="costDoughnutChart"></canvas>
+            </div>
+            <div class="flex justify-center gap-4 text-xs mt-3 pt-2 border-t border-slate-100 text-slate-600">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Input
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Cached
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Output
+              </div>
+            </div>
+          </div>
+
+          <!-- Bar Chart: Subtotal Cost Breakdown -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Token Subtotals & Total</h3>
+            <div class="relative h-56 flex items-center justify-center">
+              <canvas id="costBarChart"></canvas>
+            </div>
+            <p id="bar-chart-subtext" class="text-[11px] text-center text-slate-400 mt-3 pt-2 border-t border-slate-100">
+              Breakdown for Gemini 4 Argon ($2.00 In / $10.00 Out).
+            </p>
+          </div>
+
+        </div>
+
+        <!-- Active Model Rate Summary Table -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm overflow-hidden">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Rate Configuration Table</h3>
+            <span id="rate-table-model-name" class="text-xs font-bold text-slate-700">Gemini 4 Argon</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                  <th class="py-2.5 px-3">Token Category</th>
+                  <th class="py-2.5 px-3">Configured Rate ($ / 1M)</th>
+                  <th class="py-2.5 px-3">Cost per Token ($)</th>
+                  <th class="py-2.5 px-3">Cost per 1k Tokens ($)</th>
+                  <th class="py-2.5 px-3">Tokens Processed</th>
+                  <th class="py-2.5 px-3 text-right">Subtotal Spend ($)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-mono">
+                <tr class="hover:bg-slate-50/60">
+                  <td class="py-2 px-3 font-sans font-medium text-slate-800">Fresh Input Tokens</td>
+                  <td id="tbl-input-rate" class="py-2 px-3 text-blue-700 font-bold">$2.00</td>
+                  <td id="tbl-input-per-tok" class="py-2 px-3 text-slate-500">$0.0000020</td>
+                  <td id="tbl-input-per-1k" class="py-2 px-3 text-slate-600">$0.00200</td>
+                  <td id="tbl-input-qty" class="py-2 px-3 text-slate-700 font-sans">50,000</td>
+                  <td id="tbl-input-cost" class="py-2 px-3 text-right text-blue-950 font-bold">$0.1000</td>
+                </tr>
+                <tr class="hover:bg-slate-50/60 bg-emerald-50/30">
+                  <td class="py-2 px-3 font-sans font-medium text-emerald-900">Context Cached Input</td>
+                  <td id="tbl-cache-rate" class="py-2 px-3 text-emerald-700 font-bold">$0.10</td>
+                  <td id="tbl-cache-per-tok" class="py-2 px-3 text-emerald-600">$0.0000001</td>
+                  <td id="tbl-cache-per-1k" class="py-2 px-3 text-emerald-700">$0.00010</td>
+                  <td id="tbl-cache-qty" class="py-2 px-3 text-slate-700 font-sans">0</td>
+                  <td id="tbl-cache-cost" class="py-2 px-3 text-right text-emerald-950 font-bold">$0.0000</td>
+                </tr>
+                <tr class="hover:bg-slate-50/60">
+                  <td class="py-2 px-3 font-sans font-medium text-slate-800">Generated Output Tokens</td>
+                  <td id="tbl-output-rate" class="py-2 px-3 text-indigo-700 font-bold">$10.00</td>
+                  <td id="tbl-output-per-tok" class="py-2 px-3 text-slate-500">$0.0000100</td>
+                  <td id="tbl-output-per-1k" class="py-2 px-3 text-slate-600">$0.01000</td>
+                  <td id="tbl-output-qty" class="py-2 px-3 text-slate-700 font-sans">10,000</td>
+                  <td id="tbl-output-cost" class="py-2 px-3 text-right text-indigo-950 font-bold">$0.1000</td>
+                </tr>
+                <tr class="border-t-2 border-slate-300 bg-slate-50/80 font-sans font-bold">
+                  <td class="py-2.5 px-3 text-slate-900">Total per Request</td>
+                  <td class="py-2.5 px-3 text-slate-500 font-normal">—</td>
+                  <td class="py-2.5 px-3 text-slate-500 font-normal">—</td>
+                  <td id="tbl-blended-per-1k" class="py-2.5 px-3 text-slate-800 font-mono">$0.00333</td>
+                  <td id="tbl-total-qty" class="py-2.5 px-3 text-slate-900">60,000</td>
+                  <td id="tbl-total-cost" class="py-2.5 px-3 text-right text-slate-900 font-mono text-sm">$0.2000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div>
+        <p class="font-medium text-slate-700">Universal LLM Token Economics & API Cost Estimator</p>
+        <p class="text-[11px] mt-0.5">Calculations update dynamically based on user-defined model parameters and volume multipliers.</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span>Formula: Cost = (Input × Rate_in / 1M) + (Cached × Rate_cache / 1M) + (Output × Rate_out / 1M)</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    // State management
+    const state = {
+      modelName: 'Gemini 4 Argon',
+      inputRatePerM: 2.00,
+      outputRatePerM: 10.00,
+      cacheRatePerM: 0.10,
+      inputTokens: 50000,
+      outputTokens: 10000,
+      isCachingEnabled: false,
+      cachedTokens: 0,
+      requestsCount: 1
+    };
+
+    // DOM Elements - Model Config
+    const customModelNameEl = document.getElementById('custom-model-name');
+    const rateInputPerMEl = document.getElementById('rate-input-per-m');
+    const rateOutputPerMEl = document.getElementById('rate-output-per-m');
+    const rateCachePerMEl = document.getElementById('rate-cache-per-m');
+
+    const labelCostPerInputTok = document.getElementById('label-cost-per-input-tok');
+    const labelCostPerOutputTok = document.getElementById('label-cost-per-output-tok');
+    const labelCostPerCacheTok = document.getElementById('label-cost-per-cache-tok');
+
+    const headerModelBadge = document.getElementById('header-model-badge');
+    const summaryModelPill = document.getElementById('summary-model-pill');
+    const formulaModelTag = document.getElementById('formula-model-tag');
+    const rateTableModelName = document.getElementById('rate-table-model-name');
+    const barChartSubtext = document.getElementById('bar-chart-subtext');
+
+    // Model Presets
+    const modelPresetGeminiPromo = document.getElementById('model-preset-gemini-promo');
+    const modelPresetGeminiBase = document.getElementById('model-preset-gemini-base');
+    const modelPresetGpt4o = document.getElementById('model-preset-gpt4o');
+    const modelPresetClaude = document.getElementById('model-preset-claude');
+    const modelPresetLlama = document.getElementById('model-preset-llama');
+
+    // Token Controls
+    const inputTokensEl = document.getElementById('input-tokens');
+    const sliderInputTokensEl = document.getElementById('slider-input-tokens');
+    const labelAppliedInputRate = document.getElementById('label-applied-input-rate');
+
+    const toggleCacheEl = document.getElementById('toggle-cache');
+    const cacheControlsEl = document.getElementById('cache-controls');
+    const cachedTokensEl = document.getElementById('cached-tokens');
+    const sliderCachedTokensEl = document.getElementById('slider-cached-tokens');
+    const labelAppliedCacheRate = document.getElementById('label-applied-cache-rate');
+
+    const outputTokensEl = document.getElementById('output-tokens');
+    const sliderOutputTokensEl = document.getElementById('slider-output-tokens');
+    const labelAppliedOutputRate = document.getElementById('label-applied-output-rate');
+
+    const requestCountEl = document.getElementById('request-count');
+    const volumeHighlightBox = document.getElementById('volume-highlight-box');
+    const metricBatchCost = document.getElementById('metric-batch-cost');
+    const metricBatchSubtext = document.getElementById('metric-batch-subtext');
+
+    const metricTotalCost = document.getElementById('metric-total-cost');
+    const dynamicFormula = document.getElementById('dynamic-formula');
+
+    // Cards
+    const cardInputCost = document.getElementById('card-input-cost');
+    const cardInputTokens = document.getElementById('card-input-tokens');
+    const cardInputPct = document.getElementById('card-input-pct');
+    const cardInputRateSub = document.getElementById('card-input-rate-sub');
+
+    const cardCacheCost = document.getElementById('card-cache-cost');
+    const cardCacheTokens = document.getElementById('card-cache-tokens');
+    const cardCachePct = document.getElementById('card-cache-pct');
+    const cardCacheRateSub = document.getElementById('card-cache-rate-sub');
+
+    const cardOutputCost = document.getElementById('card-output-cost');
+    const cardOutputTokens = document.getElementById('card-output-tokens');
+    const cardOutputPct = document.getElementById('card-output-pct');
+    const cardOutputRateSub = document.getElementById('card-output-rate-sub');
+
+    const blendedRateText = document.getElementById('blended-rate-text');
+    const totalTokensBadge = document.getElementById('total-tokens-badge');
+
+    // Table elements
+    const tblInputRate = document.getElementById('tbl-input-rate');
+    const tblInputPerTok = document.getElementById('tbl-input-per-tok');
+    const tblInputPer1k = document.getElementById('tbl-input-per-1k');
+    const tblInputQty = document.getElementById('tbl-input-qty');
+    const tblInputCost = document.getElementById('tbl-input-cost');
+
+    const tblCacheRate = document.getElementById('tbl-cache-rate');
+    const tblCachePerTok = document.getElementById('tbl-cache-per-tok');
+    const tblCachePer1k = document.getElementById('tbl-cache-per-1k');
+    const tblCacheQty = document.getElementById('tbl-cache-qty');
+    const tblCacheCost = document.getElementById('tbl-cache-cost');
+
+    const tblOutputRate = document.getElementById('tbl-output-rate');
+    const tblOutputPerTok = document.getElementById('tbl-output-per-tok');
+    const tblOutputPer1k = document.getElementById('tbl-output-per-1k');
+    const tblOutputQty = document.getElementById('tbl-output-qty');
+    const tblOutputCost = document.getElementById('tbl-output-cost');
+
+    const tblBlendedPer1k = document.getElementById('tbl-blended-per-1k');
+    const tblTotalQty = document.getElementById('tbl-total-qty');
+    const tblTotalCost = document.getElementById('tbl-total-cost');
+
+    // Action buttons & toast
+    const btnResetDefaults = document.getElementById('btn-reset-defaults');
+    const btnCopySummary = document.getElementById('btn-copy-summary');
+    const toastEl = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+
+    // Presets
+    const presetExample = document.getElementById('preset-example');
+    const presetChat = document.getElementById('preset-chat');
+    const presetCoding = document.getElementById('preset-coding');
+    const presetDoc = document.getElementById('preset-doc');
+    const presetCache = document.getElementById('preset-cache');
+
+    // Volume Multipliers
+    const vol1 = document.getElementById('vol-1');
+    const vol100 = document.getElementById('vol-100');
+    const vol1k = document.getElementById('vol-1k');
+    const vol10k = document.getElementById('vol-10k');
+    const vol100k = document.getElementById('vol-100k');
+
+    // Chart instances
+    let doughnutChart = null;
+    let barChart = null;
+
+    // Toast helper
+    let toastTimeout = null;
+    function showToast(msg) {
+      toastMessage.textContent = msg;
+      toastEl.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      toastEl.classList.add('opacity-100', 'translate-y-0');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toastEl.classList.remove('opacity-100', 'translate-y-0');
+        toastEl.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      }, 2500);
+    }
+
+    // Number formatting helpers
+    function formatCurrency(num, decimals = 4) {
+      if (num === 0) return '$0.0000';
+      if (num < 0.01) {
+        return '$' + num.toFixed(Math.max(4, decimals));
+      }
+      return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    }
+
+    function formatNumber(num) {
+      return num.toLocaleString('en-US');
+    }
+
+    // Core Calculation
+    function calculate() {
+      const inputCost = (state.inputTokens * state.inputRatePerM) / 1000000;
+      const cachedCost = state.isCachingEnabled ? (state.cachedTokens * state.cacheRatePerM) / 1000000 : 0;
+      const outputCost = (state.outputTokens * state.outputRatePerM) / 1000000;
+      const singleTotal = inputCost + cachedCost + outputCost;
+      const batchTotal = singleTotal * state.requestsCount;
+
+      const totalTokens = state.inputTokens + (state.isCachingEnabled ? state.cachedTokens : 0) + state.outputTokens;
+      const blendedPer1M = totalTokens > 0 ? (singleTotal / totalTokens) * 1000000 : 0;
+      const blendedPer1k = blendedPer1M / 1000;
+
+      return {
+        inputCost,
+        cachedCost,
+        outputCost,
+        singleTotal,
+        batchTotal,
+        totalTokens,
+        blendedPer1M,
+        blendedPer1k
+      };
+    }
+
+    // Update UI elements
+    function updateUI() {
+      const results = calculate();
+
+      // Update model badges and titles
+      headerModelBadge.textContent = state.modelName || 'Custom Model';
+      summaryModelPill.textContent = state.modelName || 'Custom Model';
+      formulaModelTag.textContent = state.modelName || 'Custom Model';
+      rateTableModelName.textContent = state.modelName || 'Custom Model';
+      barChartSubtext.textContent = `Cost composition for ${state.modelName || 'Custom Model'} ($${state.inputRatePerM.toFixed(2)} In / $${state.outputRatePerM.toFixed(2)} Out).`;
+
+      // Update per-token labels in configuration
+      const inputPerTok = state.inputRatePerM / 1000000;
+      const outputPerTok = state.outputRatePerM / 1000000;
+      const cachePerTok = state.cacheRatePerM / 1000000;
+
+      labelCostPerInputTok.textContent = `$${inputPerTok.toFixed(7)} / tok`;
+      labelCostPerOutputTok.textContent = `$${outputPerTok.toFixed(7)} / tok`;
+      labelCostPerCacheTok.textContent = `$${cachePerTok.toFixed(7)} / tok`;
+
+      // Update token controls applied rate indicators
+      labelAppliedInputRate.textContent = `($${state.inputRatePerM.toFixed(2)} / 1M)`;
+      labelAppliedCacheRate.textContent = `($${state.cacheRatePerM.toFixed(2)} / 1M)`;
+      labelAppliedOutputRate.textContent = `($${state.outputRatePerM.toFixed(2)} / 1M)`;
+
+      // Context caching container visibility
+      if (state.isCachingEnabled) {
+        cacheControlsEl.classList.remove('opacity-50', 'pointer-events-none');
+      } else {
+        cacheControlsEl.classList.add('opacity-50', 'pointer-events-none');
+      }
+
+      // Display primary totals
+      metricTotalCost.textContent = formatCurrency(results.singleTotal);
+
+      // Batch volume display
+      if (state.requestsCount > 1) {
+        volumeHighlightBox.classList.remove('hidden');
+        metricBatchCost.textContent = formatCurrency(results.batchTotal, 2);
+        metricBatchSubtext.textContent = `for ${formatNumber(state.requestsCount)} requests`;
+      } else {
+        volumeHighlightBox.classList.add('hidden');
+      }
+
+      // Card metrics
+      const total = results.singleTotal > 0 ? results.singleTotal : 1;
+      const inputPct = ((results.inputCost / total) * 100).toFixed(0);
+      const cachePct = ((results.cachedCost / total) * 100).toFixed(0);
+      const outputPct = ((results.outputCost / total) * 100).toFixed(0);
+
+      cardInputCost.textContent = formatCurrency(results.inputCost);
+      cardInputTokens.textContent = `${formatNumber(state.inputTokens)} tok`;
+      cardInputPct.textContent = `${inputPct}%`;
+      cardInputRateSub.textContent = `$${state.inputRatePerM.toFixed(2)}/1M`;
+
+      cardCacheCost.textContent = formatCurrency(results.cachedCost);
+      cardCacheTokens.textContent = `${formatNumber(state.cachedTokens)} tok`;
+      cardCachePct.textContent = `${cachePct}%`;
+      cardCacheRateSub.textContent = `$${state.cacheRatePerM.toFixed(2)}/1M`;
+
+      cardOutputCost.textContent = formatCurrency(results.outputCost);
+      cardOutputTokens.textContent = `${formatNumber(state.outputTokens)} tok`;
+      cardOutputPct.textContent = `${outputPct}%`;
+      cardOutputRateSub.textContent = `$${state.outputRatePerM.toFixed(2)}/1M`;
+
+      // Blended rate banner
+      blendedRateText.innerHTML = `Effective Blended Cost: <strong>$${results.blendedPer1M.toFixed(2)} per 1M total tokens</strong> ($${(results.blendedPer1M / 1000000).toFixed(7)}/tok).`;
+      totalTokensBadge.textContent = `${formatNumber(results.totalTokens)} Total Tokens`;
+
+      // Dynamic formula text
+      let formulaText = `Total Cost = (${formatNumber(state.inputTokens)} × $${state.inputRatePerM.toFixed(2)} / 1,000,000)`;
+      if (state.isCachingEnabled && state.cachedTokens > 0) {
+        formulaText += ` + (${formatNumber(state.cachedTokens)} × $${state.cacheRatePerM.toFixed(2)} / 1,000,000)`;
+      }
+      formulaText += ` + (${formatNumber(state.outputTokens)} × $${state.outputRatePerM.toFixed(2)} / 1,000,000)\n`;
+      formulaText += `= ${formatCurrency(results.inputCost)}`;
+      if (state.isCachingEnabled && state.cachedTokens > 0) {
+        formulaText += ` + ${formatCurrency(results.cachedCost)}`;
+      }
+      formulaText += ` + ${formatCurrency(results.outputCost)} = ${formatCurrency(results.singleTotal)}`;
+
+      dynamicFormula.innerText = formulaText;
+
+      // Rate Summary Table Updates
+      tblInputRate.textContent = `$${state.inputRatePerM.toFixed(2)}`;
+      tblInputPerTok.textContent = `$${inputPerTok.toFixed(7)}`;
+      tblInputPer1k.textContent = `$${(state.inputRatePerM / 1000).toFixed(5)}`;
+      tblInputQty.textContent = formatNumber(state.inputTokens);
+      tblInputCost.textContent = formatCurrency(results.inputCost);
+
+      tblCacheRate.textContent = `$${state.cacheRatePerM.toFixed(2)}`;
+      tblCachePerTok.textContent = `$${cachePerTok.toFixed(7)}`;
+      tblCachePer1k.textContent = `$${(state.cacheRatePerM / 1000).toFixed(5)}`;
+      tblCacheQty.textContent = state.isCachingEnabled ? formatNumber(state.cachedTokens) : '0 (Off)';
+      tblCacheCost.textContent = formatCurrency(results.cachedCost);
+
+      tblOutputRate.textContent = `$${state.outputRatePerM.toFixed(2)}`;
+      tblOutputPerTok.textContent = `$${outputPerTok.toFixed(7)}`;
+      tblOutputPer1k.textContent = `$${(state.outputRatePerM / 1000).toFixed(5)}`;
+      tblOutputQty.textContent = formatNumber(state.outputTokens);
+      tblOutputCost.textContent = formatCurrency(results.outputCost);
+
+      tblBlendedPer1k.textContent = `$${results.blendedPer1k.toFixed(5)}`;
+      tblTotalQty.textContent = formatNumber(results.totalTokens);
+      tblTotalCost.textContent = formatCurrency(results.singleTotal);
+
+      // Update charts
+      updateCharts(results);
+    }
+
+    // Chart Initialization and Updates
+    function initCharts() {
+      const doughnutCtx = document.getElementById('costDoughnutChart').getContext('2d');
+      doughnutChart = new Chart(doughnutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Fresh Input', 'Cached Input', 'Output'],
+          datasets: [{
+            data: [0.10, 0, 0.10],
+            backgroundColor: ['#3b82f6', '#10b981', '#6366f1'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.label}: $${context.raw.toFixed(4)}`;
+                }
+              }
+            }
+          },
+          cutout: '68%'
+        }
+      });
+
+      const barCtx = document.getElementById('costBarChart').getContext('2d');
+      barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Fresh Input', 'Cached Input', 'Output', 'Total Cost'],
+          datasets: [
+            {
+              label: 'Cost ($)',
+              data: [0.10, 0, 0.10, 0.20],
+              backgroundColor: ['#3b82f6', '#10b981', '#6366f1', '#1e293b'],
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return ` Cost: $${context.raw.toFixed(4)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(val) { return '$' + val; },
+                font: { size: 10 }
+              },
+              grid: { color: '#f1f5f9' }
+            },
+            x: {
+              ticks: { font: { size: 10 } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function updateCharts(results) {
+      if (!doughnutChart || !barChart) return;
+
+      // Doughnut
+      doughnutChart.data.datasets[0].data = [
+        results.inputCost,
+        results.cachedCost,
+        results.outputCost
+      ];
+      doughnutChart.update();
+
+      // Bar Chart
+      barChart.data.datasets[0].data = [
+        results.inputCost,
+        results.cachedCost,
+        results.outputCost,
+        results.singleTotal
+      ];
+      barChart.update();
+    }
+
+    // Event Listeners: Model Configuration
+    customModelNameEl.addEventListener('input', (e) => {
+      state.modelName = e.target.value.trim() || 'Custom Model';
+      updateUI();
+    });
+
+    rateInputPerMEl.addEventListener('input', (e) => {
+      state.inputRatePerM = Math.max(0, parseFloat(e.target.value) || 0);
+      updateUI();
+    });
+
+    rateOutputPerMEl.addEventListener('input', (e) => {
+      state.outputRatePerM = Math.max(0, parseFloat(e.target.value) || 0);
+      updateUI();
+    });
+
+    rateCachePerMEl.addEventListener('input', (e) => {
+      state.cacheRatePerM = Math.max(0, parseFloat(e.target.value) || 0);
+      updateUI();
+    });
+
+    // Model Presets Listeners
+    modelPresetGeminiPromo.addEventListener('click', () => {
+      state.modelName = 'Gemini 4 Argon (Promo)';
+      state.inputRatePerM = 2.00;
+      state.outputRatePerM = 10.00;
+      state.cacheRatePerM = 0.10;
+      syncModelConfigInputs();
+      updateUI();
+      showToast('Loaded Gemini 4 Argon 50% Launch Promo ($2 / $10)');
+    });
+
+    modelPresetGeminiBase.addEventListener('click', () => {
+      state.modelName = 'Gemini 4 Argon (Base)';
+      state.inputRatePerM = 4.00;
+      state.outputRatePerM = 20.00;
+      state.cacheRatePerM = 0.20;
+      syncModelConfigInputs();
+      updateUI();
+      showToast('Loaded Gemini 4 Argon Base Standard ($4 / $20)');
+    });
+
+    modelPresetGpt4o.addEventListener('click', () => {
+      state.modelName = 'GPT-4o';
+      state.inputRatePerM = 2.50;
+      state.outputRatePerM = 10.00;
+      state.cacheRatePerM = 1.25;
+      syncModelConfigInputs();
+      updateUI();
+      showToast('Loaded GPT-4o Presets ($2.50 / $10.00)');
+    });
+
+    modelPresetClaude.addEventListener('click', () => {
+      state.modelName = 'Claude 3.5 Sonnet';
+      state.inputRatePerM = 3.00;
+      state.outputRatePerM = 15.00;
+      state.cacheRatePerM = 0.30;
+      syncModelConfigInputs();
+      updateUI();
+      showToast('Loaded Claude 3.5 Sonnet Presets ($3.00 / $15.00)');
+    });
+
+    modelPresetLlama.addEventListener('click', () => {
+      state.modelName = 'Llama 3.3 70B';
+      state.inputRatePerM = 0.40;
+      state.outputRatePerM = 0.40;
+      state.cacheRatePerM = 0.05;
+      syncModelConfigInputs();
+      updateUI();
+      showToast('Loaded Llama 3.3 70B Presets ($0.40 / $0.40)');
+    });
+
+    function syncModelConfigInputs() {
+      customModelNameEl.value = state.modelName;
+      rateInputPerMEl.value = state.inputRatePerM.toFixed(2);
+      rateOutputPerMEl.value = state.outputRatePerM.toFixed(2);
+      rateCachePerMEl.value = state.cacheRatePerM.toFixed(2);
+    }
+
+    // Token Inputs Listeners
+    inputTokensEl.addEventListener('input', (e) => {
+      const val = Math.max(0, parseInt(e.target.value) || 0);
+      state.inputTokens = val;
+      sliderInputTokensEl.value = Math.min(val, 200000);
+      updateUI();
+    });
+
+    sliderInputTokensEl.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      state.inputTokens = val;
+      inputTokensEl.value = val;
+      updateUI();
+    });
+
+    outputTokensEl.addEventListener('input', (e) => {
+      const val = Math.max(0, parseInt(e.target.value) || 0);
+      state.outputTokens = val;
+      sliderOutputTokensEl.value = Math.min(val, 50000);
+      updateUI();
+    });
+
+    sliderOutputTokensEl.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      state.outputTokens = val;
+      outputTokensEl.value = val;
+      updateUI();
+    });
+
+    toggleCacheEl.addEventListener('change', (e) => {
+      state.isCachingEnabled = e.target.checked;
+      updateUI();
+    });
+
+    cachedTokensEl.addEventListener('input', (e) => {
+      const val = Math.max(0, parseInt(e.target.value) || 0);
+      state.cachedTokens = val;
+      sliderCachedTokensEl.value = Math.min(val, 200000);
+      updateUI();
+    });
+
+    sliderCachedTokensEl.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      state.cachedTokens = val;
+      cachedTokensEl.value = val;
+      updateUI();
+    });
+
+    requestCountEl.addEventListener('input', (e) => {
+      state.requestsCount = Math.max(1, parseInt(e.target.value) || 1);
+      updateUI();
+    });
+
+    // Volume Buttons
+    vol1.addEventListener('click', () => { state.requestsCount = 1; requestCountEl.value = 1; updateUI(); });
+    vol100.addEventListener('click', () => { state.requestsCount = 100; requestCountEl.value = 100; updateUI(); });
+    vol1k.addEventListener('click', () => { state.requestsCount = 1000; requestCountEl.value = 1000; updateUI(); });
+    vol10k.addEventListener('click', () => { state.requestsCount = 10000; requestCountEl.value = 10000; updateUI(); });
+    vol100k.addEventListener('click', () => { state.requestsCount = 100000; requestCountEl.value = 100000; updateUI(); });
+
+    // Workload Presets
+    presetExample.addEventListener('click', () => {
+      state.inputTokens = 50000;
+      state.outputTokens = 10000;
+      state.isCachingEnabled = false;
+      state.cachedTokens = 0;
+      state.requestsCount = 1;
+      syncTokenInputs();
+      updateUI();
+      showToast('Loaded Default Example (50k In / 10k Out)');
+    });
+
+    presetChat.addEventListener('click', () => {
+      state.inputTokens = 2500;
+      state.outputTokens = 600;
+      state.isCachingEnabled = false;
+      state.cachedTokens = 0;
+      syncTokenInputs();
+      updateUI();
+      showToast('Loaded Quick Chat Preset');
+    });
+
+    presetCoding.addEventListener('click', () => {
+      state.inputTokens = 25000;
+      state.outputTokens = 4000;
+      state.isCachingEnabled = false;
+      state.cachedTokens = 0;
+      syncTokenInputs();
+      updateUI();
+      showToast('Loaded Code Review Preset');
+    });
+
+    presetDoc.addEventListener('click', () => {
+      state.inputTokens = 120000;
+      state.outputTokens = 8000;
+      state.isCachingEnabled = false;
+      state.cachedTokens = 0;
+      syncTokenInputs();
+      updateUI();
+      showToast('Loaded Document Analysis Preset');
+    });
+
+    presetCache.addEventListener('click', () => {
+      state.inputTokens = 10000;
+      state.outputTokens = 3000;
+      state.isCachingEnabled = true;
+      state.cachedTokens = 80000;
+      syncTokenInputs();
+      updateUI();
+      showToast('Loaded Context Caching Preset (80k cached)');
+    });
+
+    btnResetDefaults.addEventListener('click', () => {
+      state.modelName = 'Gemini 4 Argon';
+      state.inputRatePerM = 2.00;
+      state.outputRatePerM = 10.00;
+      state.cacheRatePerM = 0.10;
+      state.inputTokens = 50000;
+      state.outputTokens = 10000;
+      state.isCachingEnabled = false;
+      state.cachedTokens = 0;
+      state.requestsCount = 1;
+      syncModelConfigInputs();
+      syncTokenInputs();
+      updateUI();
+      showToast('Reset to default Gemini 4 Argon parameters');
+    });
+
+    function syncTokenInputs() {
+      inputTokensEl.value = state.inputTokens;
+      sliderInputTokensEl.value = Math.min(state.inputTokens, 200000);
+      outputTokensEl.value = state.outputTokens;
+      sliderOutputTokensEl.value = Math.min(state.outputTokens, 50000);
+      toggleCacheEl.checked = state.isCachingEnabled;
+      cachedTokensEl.value = state.cachedTokens;
+      sliderCachedTokensEl.value = Math.min(state.cachedTokens, 200000);
+      requestCountEl.value = state.requestsCount;
+    }
+
+    // Copy Summary Action
+    btnCopySummary.addEventListener('click', () => {
+      const res = calculate();
+      const textToCopy = `LLM API Cost Summary — ${state.modelName}
+Pricing Rates:
+• Input Rate: $${state.inputRatePerM.toFixed(2)} / 1M tokens ($${(state.inputRatePerM/1000000).toFixed(7)}/tok)
+• Output Rate: $${state.outputRatePerM.toFixed(2)} / 1M tokens ($${(state.outputRatePerM/1000000).toFixed(7)}/tok)
+${state.isCachingEnabled ? `• Cached Rate: $${state.cacheRatePerM.toFixed(2)} / 1M tokens ($${(state.cacheRatePerM/1000000).toFixed(7)}/tok)\n` : ''}
+Tokens & Costs:
+• Fresh Input: ${formatNumber(state.inputTokens)} tokens → $${res.inputCost.toFixed(4)}
+${state.isCachingEnabled ? `• Cached Input: ${formatNumber(state.cachedTokens)} tokens → $${res.cachedCost.toFixed(4)}\n` : ''}• Generated Output: ${formatNumber(state.outputTokens)} tokens → $${res.outputCost.toFixed(4)}
+• Total Cost per Request: $${res.singleTotal.toFixed(4)}
+${state.requestsCount > 1 ? `• Batch Requests (${formatNumber(state.requestsCount)}): $${res.batchTotal.toFixed(2)}\n` : ''}• Effective Blended Rate: $${res.blendedPer1M.toFixed(2)} / 1M tokens
+Formula: (${formatNumber(state.inputTokens)} × $${state.inputRatePerM.toFixed(2)}/1M) + (${formatNumber(state.outputTokens)} × $${state.outputRatePerM.toFixed(2)}/1M) = $${res.singleTotal.toFixed(4)}`;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast('Cost summary copied to clipboard!');
+        }).catch(() => {
+          fallbackCopy(textToCopy);
+        });
+      } else {
+        fallbackCopy(textToCopy);
+      }
+    });
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Cost summary copied to clipboard!');
+      } catch (err) {
+        showToast('Unable to copy to clipboard');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // Initialize on page load
+    window.onload = function() {
+      initCharts();
+      syncModelConfigInputs();
+      syncTokenInputs();
+      updateUI();
+    };
+  </script>
+</body>
+</html>
